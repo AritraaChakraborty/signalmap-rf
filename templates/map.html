@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Coverage Map — SignalMap{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-head">
+    <div class="eyebrow">CO6 · Spatial Scatter View</div>
+    <h1>Interactive Coverage Map</h1>
+    <p>
+      Adjust the weak-signal threshold live to observe how classification shifts across the
+      floor plan. Hover any point for coordinates, distance from AP-01, and measured RSSI.
+    </p>
+  </div>
+
+  <div class="controls-bar">
+    <div class="control-group">
+      <label for="weak-slider">
+        <span>Weak threshold</span>
+        <span class="mono" id="weak-val">-75 dBm</span>
+      </label>
+      <input id="weak-slider" type="range" min="-90" max="-65" step="1" value="-75" />
+    </div>
+    <div class="control-group">
+      <label for="strong-slider">
+        <span>Strong threshold</span>
+        <span class="mono" id="strong-val">-60 dBm</span>
+      </label>
+      <input id="strong-slider" type="range" min="-64" max="-45" step="1" value="-60" />
+    </div>
+    <div class="control-group">
+      <label for="loc-filter">Location filter</label>
+      <select id="loc-filter">
+        <option value="All">All locations</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi-box">
+      <div class="kpi-label">Strong Points</div>
+      <div class="kpi-val" id="m-strong" style="color: var(--strong);">--</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Fair Points</div>
+      <div class="kpi-val" id="m-fair" style="color: var(--fair);">--</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Weak Points</div>
+      <div class="kpi-val" id="m-weak" style="color: var(--weak);">--</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Weak Share</div>
+      <div class="kpi-val" id="m-weak-pct">--</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Floor Survey Scatter Map (40 m &times; 30 m)</span>
+      <span id="map-meta" class="panel-meta">--</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="map-canvas"></canvas>
+      <div id="map-tooltip" class="chart-tooltip"></div>
+    </div>
+    <div class="legend-row">
+      <span class="legend-item"><span class="dot dot-strong"></span>Strong</span>
+      <span class="legend-item"><span class="dot dot-fair"></span>Fair</span>
+      <span class="legend-item"><span class="dot dot-weak"></span>Weak</span>
+      <span class="legend-item"><span class="dot dot-ap"></span>AP-01 (4 m, 15 m)</span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const weakSlider = document.getElementById("weak-slider");
+  const strongSlider = document.getElementById("strong-slider");
+  const locFilter = document.getElementById("loc-filter");
+  const thr = SignalApp.getThresholds();
+  weakSlider.value = thr.weak;
+  strongSlider.value = thr.strong;
+
+  let latestData = null;
+
+  async function refreshMap() {
+    const w = parseFloat(weakSlider.value);
+    const s = Math.max(w + 5, parseFloat(strongSlider.value));
+    strongSlider.value = s;
+    document.getElementById("weak-val").textContent = `${w} dBm`;
+    document.getElementById("strong-val").textContent = `${s} dBm`;
+    SignalApp.setThresholds(w, s);
+
+    latestData = await SignalApp.fetchAnalysis({ weak_threshold: w, strong_threshold: s });
+
+    if (locFilter.options.length === 1) {
+      latestData.locations.forEach(loc => {
+        const opt = document.createElement("option");
+        opt.value = loc.location;
+        opt.textContent = loc.location;
+        locFilter.appendChild(opt);
+      });
+    }
+
+    document.getElementById("m-strong").textContent = latestData.kpis.strong_count;
+    document.getElementById("m-fair").textContent = latestData.kpis.fair_count;
+    document.getElementById("m-weak").textContent = latestData.kpis.weak_count;
+    document.getElementById("m-weak-pct").textContent = `${latestData.kpis.weak_pct}%`;
+    document.getElementById("map-meta").textContent =
+      `Weak < ${w} dBm · Strong >= ${s} dBm`;
+
+    SignalApp.drawScatterMap(document.getElementById("map-canvas"), latestData, {
+      locationFilter: locFilter.value,
+      tooltipEl: document.getElementById("map-tooltip"),
+    });
+  }
+
+  weakSlider.addEventListener("input", refreshMap);
+  strongSlider.addEventListener("input", refreshMap);
+  locFilter.addEventListener("change", () => {
+    if (latestData) {
+      SignalApp.drawScatterMap(document.getElementById("map-canvas"), latestData, {
+        locationFilter: locFilter.value,
+        tooltipEl: document.getElementById("map-tooltip"),
+      });
+    }
+  });
+
+  await refreshMap();
+  window.addEventListener("resize", () => {
+    if (latestData) {
+      SignalApp.drawScatterMap(document.getElementById("map-canvas"), latestData, {
+        locationFilter: locFilter.value,
+        tooltipEl: document.getElementById("map-tooltip"),
+      });
+    }
+  });
+});
+</script>
+{% endblock %}

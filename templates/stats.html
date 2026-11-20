@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Statistics — SignalMap{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-head">
+    <div class="eyebrow">CO4 &amp; CO5 · Distribution, Grid &amp; Location Summaries</div>
+    <h1>Statistical Breakdown</h1>
+    <p>
+      Inspect the overall RSSI distribution, compare rooms/wings sorted from weakest to
+      strongest, and review the coarse 4 &times; 3 spatial grid summary.
+    </p>
+  </div>
+
+  <div class="panel" style="margin-bottom: 1.75rem;">
+    <div class="panel-header">
+      <span class="panel-title">RSSI Frequency Histogram (5 dB Bins)</span>
+      <span id="hist-meta" class="panel-meta">--</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="hist-canvas"></canvas>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom: 1.75rem;">
+    <div class="panel-header">
+      <span class="panel-title">Location-Wise Comparison</span>
+      <span class="panel-meta">Sorted weakest to strongest mean RSSI</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Location</th>
+            <th>Samples</th>
+            <th>Mean (dBm)</th>
+            <th>Median (dBm)</th>
+            <th>Std Dev</th>
+            <th>Min / Max</th>
+            <th>Mean Dist (m)</th>
+            <th>Weak Points</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="loc-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Coarse 4 &times; 3 Spatial Grid Summary</span>
+      <span class="panel-meta">Highlights empty/unsurveyed cells</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Cell</th>
+            <th>X Range</th>
+            <th>Y Range</th>
+            <th>Sample Count</th>
+            <th>Mean RSSI (dBm)</th>
+            <th>Weak Count</th>
+            <th>Coverage Note</th>
+          </tr>
+        </thead>
+        <tbody id="grid-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const data = await SignalApp.fetchAnalysis();
+  document.getElementById("hist-meta").textContent =
+    `Mean ${data.kpis.mean_dbm} dBm · Median ${data.kpis.median_dbm} dBm · SD ${data.kpis.std_dbm} dB`;
+
+  document.getElementById("loc-tbody").innerHTML = data.locations.map(r => {
+    const cls = r.status === "Strong" ? "tag-strong" : r.status === "Fair" ? "tag-fair" : "tag-weak";
+    return `
+      <tr>
+        <td><strong>${r.location}</strong></td>
+        <td class="mono">${r.count}</td>
+        <td class="mono">${r.mean_dbm.toFixed(2)}</td>
+        <td class="mono">${r.median_dbm.toFixed(2)}</td>
+        <td class="mono">${r.std_dbm.toFixed(2)}</td>
+        <td class="mono">${r.min_dbm.toFixed(1)} / ${r.max_dbm.toFixed(1)}</td>
+        <td class="mono">${r.mean_distance_m.toFixed(1)}</td>
+        <td class="mono">${r.weak_count} (${r.weak_pct}%)</td>
+        <td><span class="tag ${cls}">${r.status}</span></td>
+      </tr>
+    `;
+  }).join("");
+
+  document.getElementById("grid-tbody").innerHTML = data.grid_summary.map(g => `
+    <tr>
+      <td class="mono">${g.cell}</td>
+      <td class="mono">${g.x_range}</td>
+      <td class="mono">${g.y_range}</td>
+      <td class="mono">${g.count}</td>
+      <td class="mono">${g.mean_dbm === null ? "NaN" : g.mean_dbm.toFixed(2)}</td>
+      <td class="mono">${g.weak_count}</td>
+      <td>${g.unsurveyed ? '<span class="tag tag-weak">Unsurveyed Gap</span>' : '<span class="tag tag-muted">Sampled</span>'}</td>
+    </tr>
+  `).join("");
+
+  function draw() {
+    SignalApp.drawHistogram(document.getElementById("hist-canvas"), data);
+  }
+  window.addEventListener("resize", draw);
+  draw();
+});
+</script>
+{% endblock %}

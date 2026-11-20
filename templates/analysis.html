@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Analysis &amp; Findings — SignalMap{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-head">
+    <div class="eyebrow">BL4 &amp; BL5 · Threshold Sensitivity &amp; Missing-Location Evaluation</div>
+    <h1>Analytical Findings &amp; Limitations</h1>
+    <p>
+      Evaluates which zones suffer weak reception, tests whether changing the weak-signal
+      threshold alters the engineering recommendation, and examines prediction reliability
+      inside unsurveyed floor gaps.
+    </p>
+  </div>
+
+  <div class="panel" style="margin-bottom: 1.75rem;">
+    <div class="panel-header">
+      <span class="panel-title">Threshold Sensitivity Comparison</span>
+      <span class="panel-meta">Strict (-70) vs. Default (-75) vs. Lenient (-80 dBm)</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Policy</th>
+            <th>Target Workload</th>
+            <th>Weak Points</th>
+            <th>Weak Share</th>
+            <th>Locations with Mean &lt; Threshold</th>
+          </tr>
+        </thead>
+        <tbody id="sens-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Weak-Zone &amp; Threshold Verdict</span>
+        <span class="panel-meta">Dynamic Interpretation</span>
+      </div>
+      <div id="dynamic-verdict">Loading findings...</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Handling Missing Locations &amp; Limitations</span>
+        <span class="panel-meta">Methodological Caveats</span>
+      </div>
+      <p>
+        <strong>Missing locations:</strong> Pure spatial averaging (IDW) fails cleanly in
+        unsurveyed corners because it pulls values from distant rooms without accounting for
+        radial attenuation. Blending IDW with the fitted log-distance path-loss model yields
+        physically monotonic estimates in the empty northeast sector (<span class="mono">x &gt; 28 m, y &gt; 18 m</span>),
+        which is explicitly hatched as low-confidence because actual partition walls inside that
+        gap were never measured.
+      </p>
+      <p style="margin-bottom: 0;">
+        <strong>Limitations:</strong> (1) Built-in records are synthetically generated, not
+        collected from live campus hardware; (2) the isotropic log-distance model ignores
+        directional antenna patterns and exact wall material geometry; (3) single-snapshot RSSI
+        does not capture co-channel interference or temporal fading.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const data = await SignalApp.fetchAnalysis();
+
+  document.getElementById("sens-tbody").innerHTML = data.sensitivity.map(s => `
+    <tr>
+      <td><strong>${s.label}</strong></td>
+      <td>${s.use_case}</td>
+      <td class="mono">${s.weak_points}</td>
+      <td class="mono">${s.weak_pct}%</td>
+      <td>${s.weak_mean_locations.length ? s.weak_mean_locations.join(", ") : "None"}</td>
+    </tr>
+  `).join("");
+
+  const weakest = data.locations[0];
+  const strongest = data.locations[data.locations.length - 1];
+  const strict = data.sensitivity[0];
+  const def = data.sensitivity[1];
+  const lenient = data.sensitivity[2];
+
+  document.getElementById("dynamic-verdict").innerHTML = `
+    <p>
+      Across <strong>${data.kpis.valid_points}</strong> validated survey points,
+      <strong>${weakest.location}</strong> exhibits the weakest coverage (mean
+      <span class="mono">${weakest.mean_dbm} dBm</span>, ${weakest.weak_pct}% of samples below
+      ${data.thresholds.weak_dbm} dBm), whereas <strong>${strongest.location}</strong> is strongest
+      (mean <span class="mono">${strongest.mean_dbm} dBm</span>).
+    </p>
+    <p>
+      <strong>Does the threshold change the answer?</strong> Yes in magnitude, no in priority
+      ranking. Tightening the cutoff from <span class="mono">-75 dBm</span> to
+      <span class="mono">-70 dBm</span> raises flagged weak points from
+      <strong>${def.weak_pct}%</strong> to <strong>${strict.weak_pct}%</strong>, whereas relaxing
+      to <span class="mono">-80 dBm</span> drops it to <strong>${lenient.weak_pct}%</strong>.
+      However, <strong>${weakest.location}</strong> remains the highest-priority candidate for
+      adding a second access point under all three policies.
+    </p>
+    <p style="margin-bottom: 0;">
+      The fitted path-loss exponent <span class="mono">n = ${data.model.path_loss_exponent_n.toFixed(2)}</span>
+      (RMSE <span class="mono">${data.model.rmse_db} dB</span>) confirms obstructed indoor propagation
+      exceeding free-space loss (<span class="mono">n = 2.0</span>).
+    </p>
+  `;
+});
+</script>
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Path-Loss Model — SignalMap{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-head">
+    <div class="eyebrow">CO4 · Log-Distance Path-Loss Regression</div>
+    <h1>RF Path-Loss Model</h1>
+    <p>
+      Fits indoor signal attenuation against Euclidean distance from AP-01 using ordinary
+      least squares on <span class="mono">u = 10 &middot; log10(d)</span>.
+    </p>
+  </div>
+
+  <div class="eq-box" id="model-eq">Loading fitted equation...</div>
+
+  <div class="kpi-strip">
+    <div class="kpi-box">
+      <div class="kpi-label">Reference Signal A (1 m)</div>
+      <div class="kpi-val" id="mod-a">--</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Path-Loss Exponent (n)</div>
+      <div class="kpi-val" id="mod-n">--</div>
+      <div class="kpi-sub">Free space = 2.0; indoor ~ 2.5–3.5</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">MAE / RMSE</div>
+      <div class="kpi-val" id="mod-err">--</div>
+      <div class="kpi-sub">Residual shadowing error</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Coefficient of Determination</div>
+      <div class="kpi-val" id="mod-r2">--</div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom: 1.75rem;">
+    <div class="panel-header">
+      <span class="panel-title">Measured RSSI vs. Fitted Log-Distance Curve</span>
+      <span class="panel-meta">Dashed line = active weak threshold</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="model-canvas"></canvas>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Largest Model Residuals (Shadowing &amp; Wall Obstructions)</span>
+      <span class="panel-meta">Top 12 points by |measured - predicted|</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Point ID</th>
+            <th>Location</th>
+            <th>Distance (m)</th>
+            <th>Measured (dBm)</th>
+            <th>Predicted (dBm)</th>
+            <th>Residual (dB)</th>
+          </tr>
+        </thead>
+        <tbody id="residual-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const data = await SignalApp.fetchAnalysis();
+  const m = data.model;
+  document.getElementById("model-eq").textContent = m.equation;
+  document.getElementById("mod-a").textContent = `${m.A_dbm.toFixed(2)} dBm`;
+  document.getElementById("mod-n").textContent = m.path_loss_exponent_n.toFixed(3);
+  document.getElementById("mod-err").textContent = `${m.mae_db.toFixed(2)} / ${m.rmse_db.toFixed(2)} dB`;
+  document.getElementById("mod-r2").textContent = `R² = ${m.r_squared.toFixed(3)}`;
+
+  const topResiduals = [...m.points]
+    .sort((a, b) => Math.abs(b.residual_db) - Math.abs(a.residual_db))
+    .slice(0, 12);
+
+  document.getElementById("residual-tbody").innerHTML = topResiduals.map(p => `
+    <tr>
+      <td class="mono">${p.point_id}</td>
+      <td>${p.location}</td>
+      <td class="mono">${p.distance_m.toFixed(2)}</td>
+      <td class="mono">${p.measured_dbm.toFixed(1)}</td>
+      <td class="mono">${p.predicted_dbm.toFixed(1)}</td>
+      <td class="mono" style="color: ${p.residual_db < 0 ? 'var(--weak)' : 'var(--strong)'};">
+        ${p.residual_db > 0 ? '+' : ''}${p.residual_db.toFixed(2)}
+      </td>
+    </tr>
+  `).join("");
+
+  function draw() {
+    SignalApp.drawModelPlot(document.getElementById("model-canvas"), data);
+  }
+  window.addEventListener("resize", draw);
+  draw();
+});
+</script>
+{% endblock %}

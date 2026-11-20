@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Interpolated Heatmap — SignalMap{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-head">
+    <div class="eyebrow">CO4 &amp; CO6 · Spatial Interpolation &amp; Missing Locations</div>
+    <h1>Interpolated Coverage Heatmap</h1>
+    <p>
+      Blends inverse-distance weighting (near measured points) with the fitted log-distance
+      path-loss model (inside unsurveyed gaps). Hatched cells mark regions more than 6 m away
+      from any recorded sample.
+    </p>
+  </div>
+
+  <div class="controls-bar">
+    <label style="display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer;">
+      <input id="toggle-gaps" type="checkbox" checked />
+      <span>Highlight unsurveyed gaps (&gt; 6 m from nearest sample)</span>
+    </label>
+    <label style="display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer;">
+      <input id="toggle-pts" type="checkbox" checked />
+      <span>Overlay measured points</span>
+    </label>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi-box">
+      <div class="kpi-label">Grid Resolution</div>
+      <div class="kpi-val" id="h-res">--</div>
+      <div class="kpi-sub">2 m &times; 2 m cells</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Estimated Weak Area</div>
+      <div class="kpi-val" id="h-weak-area" style="color: var(--weak);">--</div>
+      <div class="kpi-sub" id="h-weak-cells">-- cells</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Unsurveyed Gap Area</div>
+      <div class="kpi-val" id="h-gap-area">--</div>
+      <div class="kpi-sub" id="h-gap-cells">-- low-confidence cells</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Fallback Model</div>
+      <div class="kpi-val" id="h-n">--</div>
+      <div class="kpi-sub">Path-loss exponent n</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">2D Interpolated Signal Surface</span>
+      <span class="panel-meta">Hover any cell to inspect IDW/model blend &amp; distance</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="heatmap-canvas"></canvas>
+      <div id="heatmap-tooltip" class="chart-tooltip"></div>
+    </div>
+    <div class="legend-row">
+      <span class="legend-item"><span class="dot dot-strong"></span>Strong (~ -48 dBm)</span>
+      <span class="legend-item"><span class="dot dot-fair"></span>Fair (~ -73 dBm)</span>
+      <span class="legend-item"><span class="dot dot-weak"></span>Weak (~ -92 dBm)</span>
+      <span class="legend-item"><span class="mono">/ /</span> Hatched = Unsurveyed gap (lower confidence)</span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const toggleGaps = document.getElementById("toggle-gaps");
+  const togglePts = document.getElementById("toggle-pts");
+  const data = await SignalApp.fetchAnalysis();
+
+  document.getElementById("h-res").textContent = `${data.heatmap.nx} × ${data.heatmap.ny}`;
+  document.getElementById("h-weak-area").textContent = `${data.heatmap.weak_area_pct}%`;
+  document.getElementById("h-weak-cells").textContent = `${data.heatmap.weak_cell_count} of ${data.heatmap.total_cells} cells`;
+  document.getElementById("h-gap-area").textContent = `${data.heatmap.gap_area_pct}%`;
+  document.getElementById("h-gap-cells").textContent = `${data.heatmap.gap_cell_count} cells > ${data.heatmap.gap_radius_m}m`;
+  document.getElementById("h-n").textContent = `n = ${data.model.path_loss_exponent_n.toFixed(2)}`;
+
+  function draw() {
+    SignalApp.drawHeatmap(document.getElementById("heatmap-canvas"), data, {
+      showGaps: toggleGaps.checked,
+      showPoints: togglePts.checked,
+      tooltipEl: document.getElementById("heatmap-tooltip"),
+    });
+  }
+
+  toggleGaps.addEventListener("change", draw);
+  togglePts.addEventListener("change", draw);
+  window.addEventListener("resize", draw);
+  draw();
+});
+</script>
+{% endblock %}

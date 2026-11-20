@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Page Not Found — SignalMap{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 5rem 1.5rem; max-width: 620px;">
+  <div class="eyebrow">HTTP 404 · Unmapped Route</div>
+  <h1 style="font-size: 2.2rem; margin-bottom: 0.9rem;">Signal lost at this address.</h1>
+  <p style="margin-bottom: 1.75rem;">
+    The page you requested does not exist on this dashboard. Return to the main coverage view
+    or inspect the validated survey dataset.
+  </p>
+  <div class="btn-row">
+    <a class="btn btn-primary" href="/">Return home</a>
+    <a class="btn btn-secondary" href="/map">Open coverage map</a>
+  </div>
+</div>
+{% endblock %}

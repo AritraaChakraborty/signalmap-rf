@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}About &amp; Architecture — SignalMap{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-head">
+    <div class="eyebrow">Individual Project · Architecture &amp; Course Outcome Mapping</div>
+    <h1>About Wireless-Signal Coverage Mapper</h1>
+    <p>
+      An individual Python and web-based RF survey analysis tool designed to validate spatial
+      RSSI measurements, model indoor path loss, compare floor zones, and communicate
+      uncertainty over unsurveyed regions.
+    </p>
+  </div>
+
+  <div class="panel" style="margin-bottom: 1.75rem;">
+    <div class="panel-header">
+      <span class="panel-title">Course Outcome (CO1–CO6) Integration</span>
+      <span class="panel-meta">Implementation Map</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Outcome</th>
+            <th>Module</th>
+            <th>Implemented Functionality</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">CO1</td>
+            <td class="mono">core/models.py</td>
+            <td>Validation functions (<span class="mono">is_valid_coordinate</span>, <span class="mono">is_valid_rssi</span>), zone classification, and Euclidean distance computation.</td>
+          </tr>
+          <tr>
+            <td class="mono">CO2</td>
+            <td class="mono">core/io_utils.py</td>
+            <td>Dictionary/list data structures, CSV reading &amp; writing, synthetic survey generation, and row-level rejection logging.</td>
+          </tr>
+          <tr>
+            <td class="mono">CO3</td>
+            <td class="mono">core/models.py</td>
+            <td><span class="mono">SurveyPoint</span> (<span class="mono">__init__</span>, <span class="mono">__repr__</span>, <span class="mono">__eq__</span>, <span class="mono">__lt__</span>) and <span class="mono">SurveyDataset</span> (<span class="mono">__init__</span>, <span class="mono">__len__</span>, <span class="mono">__getitem__</span>, <span class="mono">__iter__</span>).</td>
+          </tr>
+          <tr>
+            <td class="mono">CO4</td>
+            <td class="mono">core/analysis_np_pd.py</td>
+            <td>NumPy arrays for vectorized distances, 2D spatial grid summaries, interpolated floor surfaces, and log-distance OLS regression.</td>
+          </tr>
+          <tr>
+            <td class="mono">CO5</td>
+            <td class="mono">core/analysis_np_pd.py</td>
+            <td>Pandas DataFrame location comparisons, weak-point percentage aggregation, and CSV/JSON summary exports.</td>
+          </tr>
+          <tr>
+            <td class="mono">CO6</td>
+            <td class="mono">core/plotting.py</td>
+            <td>Well-labelled Matplotlib scatter map, hatched coverage heatmap, RSSI histogram, and path-loss fit plots.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Why Special Methods Matter</span>
+        <span class="panel-meta">CO3 Justification</span>
+      </div>
+      <p>
+        Implementing <span class="mono">__len__</span>, <span class="mono">__getitem__</span>, and
+        <span class="mono">__iter__</span> on <span class="mono">SurveyDataset</span> lets the
+        validated collection behave like a native Python sequence—supporting
+        <span class="mono">len(ds)</span>, slicing <span class="mono">ds[:5]</span>, and direct
+        iteration without exposing internal mutable lists.
+      </p>
+      <p style="margin-bottom: 0;">
+        Implementing <span class="mono">__lt__</span> on <span class="mono">SurveyPoint</span>
+        enables direct sorting and <span class="mono">min()</span>/<span class="mono">max()</span>
+        queries by signal strength.
+      </p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Run Locally</span>
+        <span class="panel-meta">Reproducibility</span>
+      </div>
+      <pre style="margin: 0; font-size: 0.82rem; background: var(--surface-warm); padding: 0.9rem; border-radius: 4px; overflow-x: auto;">pip install -r requirements-local.txt
+python run_pipeline.py     # Generates outputs/*.png, CSV &amp; JSON
+pytest                     # Runs automated verification suite
+python api/index.py        # Starts local dashboard on :5000</pre>
+    </div>
+  </div>
+</div>
+{% endblock %}

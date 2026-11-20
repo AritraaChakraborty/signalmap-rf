@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Data &amp; Validation — SignalMap{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-head">
+    <div class="page-head-row">
+      <div>
+        <div class="eyebrow">CO1 &amp; CO2 · Input Validation</div>
+        <h1>Survey Data &amp; Validation Log</h1>
+        <p>
+          Upload a CSV with headers <span class="mono">point_id, x, y, signal_dbm, location</span>
+          (optional: <span class="mono">floor, ap_id</span>) or inspect the built-in synthetic survey.
+        </p>
+      </div>
+      <div class="btn-row">
+        <button id="btn-use-sample" class="btn btn-secondary btn-sm" type="button">Reset to sample</button>
+        <button id="btn-download-csv" class="btn btn-primary btn-sm" type="button">Download cleaned CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="upload-box">
+    <div>
+      <strong>Upload custom survey CSV</strong>
+      <div style="font-size: 0.84rem; color: var(--ink-muted);">
+        Persists in your browser session across all dashboard pages.
+      </div>
+    </div>
+    <input id="csv-file-input" type="file" accept=".csv,text/csv" />
+  </div>
+
+  <div id="data-status" class="status-banner" style="display: none;"></div>
+
+  <div class="kpi-strip">
+    <div class="kpi-box">
+      <div class="kpi-label">Total Input Rows</div>
+      <div class="kpi-val" id="d-total">--</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Accepted (Valid)</div>
+      <div class="kpi-val" id="d-valid" style="color: var(--strong);">--</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Rejected Rows</div>
+      <div class="kpi-val" id="d-rejected" style="color: var(--weak);">--</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Dataset Source</div>
+      <div class="kpi-val" id="d-source" style="font-size: 0.95rem; padding-top: 0.3rem;">--</div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom: 1.75rem;">
+    <div class="panel-header">
+      <span class="panel-title">Rejected Rows &amp; Validation Reasons</span>
+      <span id="rej-count-label" class="panel-meta">--</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>CSV Line</th>
+            <th>Point ID</th>
+            <th>x</th>
+            <th>y</th>
+            <th>signal_dbm</th>
+            <th>Location</th>
+            <th>Rejection Reason</th>
+          </tr>
+        </thead>
+        <tbody id="rejected-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Validated Survey Points</span>
+      <span id="val-count-label" class="panel-meta">--</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Point ID</th>
+            <th>Location</th>
+            <th>x (m)</th>
+            <th>y (m)</th>
+            <th>Distance (m)</th>
+            <th>RSSI (dBm)</th>
+            <th>Zone</th>
+          </tr>
+        </thead>
+        <tbody id="valid-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const statusEl = document.getElementById("data-status");
+
+  function showStatus(msg, isError = false) {
+    statusEl.textContent = msg;
+    statusEl.className = isError ? "status-banner error" : "status-banner";
+    statusEl.style.display = "block";
+  }
+
+  async function renderDataPage() {
+    try {
+      const data = await SignalApp.fetchAnalysis();
+      document.getElementById("d-total").textContent = data.meta.total_rows;
+      document.getElementById("d-valid").textContent = data.meta.valid_rows;
+      document.getElementById("d-rejected").textContent = data.meta.rejected_rows;
+      document.getElementById("d-source").textContent = data.meta.is_synthetic
+        ? "Synthetic (sample_survey.csv)"
+        : data.meta.source_label;
+
+      document.getElementById("rej-count-label").textContent = `${data.rejected.length} flagged`;
+      const rejBody = document.getElementById("rejected-tbody");
+      if (data.rejected.length === 0) {
+        rejBody.innerHTML = '<tr><td colspan="7" style="color: var(--ink-muted);">All input rows passed validation.</td></tr>';
+      } else {
+        rejBody.innerHTML = data.rejected.map(r => `
+          <tr>
+            <td class="mono">${r.row_number}</td>
+            <td class="mono">${r.point_id || "—"}</td>
+            <td class="mono">${r.x || "—"}</td>
+            <td class="mono">${r.y || "—"}</td>
+            <td class="mono">${r.signal_dbm || "—"}</td>
+            <td>${r.location || "—"}</td>
+            <td style="color: var(--weak);">${r.reason}</td>
+          </tr>
+        `).join("");
+      }
+
+      document.getElementById("val-count-label").textContent = `Showing ${data.points.length} valid records`;
+      const valBody = document.getElementById("valid-tbody");
+      valBody.innerHTML = data.points.map(p => {
+        const cls = p.zone === "Strong" ? "tag-strong" : p.zone === "Fair" ? "tag-fair" : "tag-weak";
+        return `
+          <tr>
+            <td class="mono">${p.point_id}</td>
+            <td>${p.location}</td>
+            <td class="mono">${p.x.toFixed(2)}</td>
+            <td class="mono">${p.y.toFixed(2)}</td>
+            <td class="mono">${p.distance_m.toFixed(2)}</td>
+            <td class="mono">${p.signal_dbm.toFixed(1)}</td>
+            <td><span class="tag ${cls}">${p.zone}</span></td>
+          </tr>
+        `;
+      }).join("");
+    } catch (err) {
+      showStatus(err.message, true);
+    }
+  }
+
+  document.getElementById("csv-file-input").addEventListener("change", async (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    SignalApp.saveCustomCSV(text, file.name);
+    showStatus(`Loaded "${file.name}". Validating rows...`);
+    await renderDataPage();
+  });
+
+  document.getElementById("btn-use-sample").addEventListener("click", async () => {
+    SignalApp.clearCustomCSV();
+    showStatus("Restored built-in synthetic survey dataset.");
+    await renderDataPage();
+  });
+
+  document.getElementById("btn-download-csv").addEventListener("click", () => {
+    SignalApp.downloadCleanedCSV();
+  });
+
+  await renderDataPage();
+});
+</script>
+{% endblock %}

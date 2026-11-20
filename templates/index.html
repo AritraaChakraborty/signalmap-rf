@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Wireless-Signal Coverage Mapper{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="container hero-grid">
+    <div>
+      <div class="eyebrow">Indoor RF Survey &amp; Path-Loss Tool</div>
+      <h1>Map indoor wireless coverage, <span class="hero-accent">not guesswork.</span></h1>
+      <p class="hero-lead">
+        Load spatial RSSI measurements from CSV, validate coordinates and signal bounds,
+        fit a log-distance path-loss model, and inspect weak zones alongside unsurveyed floor gaps.
+      </p>
+      <div class="btn-row">
+        <button id="btn-load-sample" class="btn btn-primary" type="button">Load sample dataset</button>
+        <a class="btn btn-secondary" href="/data">Upload survey CSV</a>
+      </div>
+      <p class="hero-footnote">
+        Default data (130 rows: 124 valid, 6 deliberately malformed) is synthetically simulated
+        over a 40 m &times; 30 m floor plan and never represented as field measurements.
+      </p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Live Floor Signal Preview</span>
+        <span id="home-preview-meta" class="panel-meta">Syncing...</span>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="home-preview-canvas"></canvas>
+        <div id="home-tooltip" class="chart-tooltip"></div>
+      </div>
+      <div class="legend-row">
+        <span class="legend-item"><span class="dot dot-strong"></span>Strong (&ge; -60 dBm)</span>
+        <span class="legend-item"><span class="dot dot-fair"></span>Fair (-75 to -60 dBm)</span>
+        <span class="legend-item"><span class="dot dot-weak"></span>Weak (&lt; -75 dBm)</span>
+        <span class="legend-item"><span class="dot dot-ap"></span>AP-01 Origin</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="kpi-strip" id="home-kpis">
+      <div class="kpi-box">
+        <div class="kpi-label">Valid Survey Points</div>
+        <div class="kpi-val" id="kpi-valid">--</div>
+        <div class="kpi-sub" id="kpi-rejected">-- rejected</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Mean Signal Strength</div>
+        <div class="kpi-val" id="kpi-mean">--</div>
+        <div class="kpi-sub" id="kpi-median">Median --</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Path-Loss Exponent (n)</div>
+        <div class="kpi-val" id="kpi-n">--</div>
+        <div class="kpi-sub" id="kpi-rmse">RMSE -- dB</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Weak-Zone Points</div>
+        <div class="kpi-val" id="kpi-weak">--</div>
+        <div class="kpi-sub" id="kpi-gap">Unsurveyed gap --%</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">What This Tool Computes</span>
+          <span class="panel-meta">Pipeline</span>
+        </div>
+        <p>
+          Every uploaded or sample CSV row is checked against physical coordinate limits
+          (<span class="mono">0–100 m</span>) and plausible Wi-Fi RSSI bounds
+          (<span class="mono">-110 to -10 dBm</span>). Invalid rows are separated with explicit
+          rejection reasons rather than silently dropped.
+        </p>
+        <p style="margin-bottom: 0;">
+          Valid points are fitted to the indoor log-distance path-loss model
+          <span class="mono">RSSI(d) = A - 10&middot;n&middot;log10(d)</span>, then combined with
+          inverse-distance weighting to estimate coverage across unsurveyed regions.
+        </p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Core Analytical Questions</span>
+          <span class="panel-meta">Evaluation</span>
+        </div>
+        <p>
+          <strong>1. Where are the weak zones?</strong> Compare room-level averages and individual
+          dropouts in <a href="/map" style="text-decoration: underline;">Coverage Map</a> and
+          <a href="/stats" style="text-decoration: underline;">Statistics</a>.
+        </p>
+        <p style="margin-bottom: 0;">
+          <strong>2. Does the threshold change the verdict?</strong> Inspect strict (-70 dBm),
+          default (-75 dBm), and lenient (-80 dBm) sensitivity plus gap confidence in
+          <a href="/analysis" style="text-decoration: underline;">Analysis</a>.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  async function renderHome() {
+    const data = await SignalApp.fetchAnalysis();
+    document.getElementById("kpi-valid").textContent = data.kpis.valid_points;
+    document.getElementById("kpi-rejected").textContent = `${data.kpis.rejected_points} rejected rows`;
+    document.getElementById("kpi-mean").textContent = `${data.kpis.mean_dbm} dBm`;
+    document.getElementById("kpi-median").textContent = `Median ${data.kpis.median_dbm} dBm`;
+    document.getElementById("kpi-n").textContent = data.model.path_loss_exponent_n.toFixed(2);
+    document.getElementById("kpi-rmse").textContent = `RMSE ${data.model.rmse_db} dB`;
+    document.getElementById("kpi-weak").textContent = `${data.kpis.weak_count} (${data.kpis.weak_pct}%)`;
+    document.getElementById("kpi-gap").textContent = `Unsurveyed area ${data.heatmap.gap_area_pct}%`;
+    document.getElementById("home-preview-meta").textContent =
+      `Weak < ${data.thresholds.weak_dbm} dBm · R² = ${data.model.r_squared}`;
+
+    SignalApp.drawScatterMap(document.getElementById("home-preview-canvas"), data, {
+      tooltipEl: document.getElementById("home-tooltip"),
+      aspectRatio: 0.62,
+    });
+  }
+
+  document.getElementById("btn-load-sample").addEventListener("click", async () => {
+    SignalApp.clearCustomCSV();
+    await renderHome();
+  });
+
+  await renderHome();
+  window.addEventListener("resize", renderHome);
+});
+</script>
+{% endblock %}

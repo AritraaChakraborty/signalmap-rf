@@ -1,0 +1,78 @@
+{
+  "meta": {
+    "source_label": "Synthetic Floor Survey (sample_survey.csv)",
+    "is_synthetic": true,
+    "total_rows": 130,
+    "valid_rows": 124,
+    "rejected_rows": 6
+  },
+  "overall_stats": {
+    "mean_dbm": -66.57,
+    "median_dbm": -67.4,
+    "std_dbm": 10.49,
+    "min_dbm": -85.2,
+    "max_dbm": -36.3,
+    "weak_count_at_neg75": 29
+  },
+  "path_loss_model": {
+    "ap_origin": {
+      "x": 4.0,
+      "y": 15.0
+    },
+    "A_dbm": -30.433,
+    "path_loss_exponent_n": 3.211,
+    "mae_db": 2.551,
+    "rmse_db": 3.207,
+    "r_squared": 0.906
+  },
+  "location_summary": [
+    {
+      "location": "Lab Block",
+      "sample_count": 34,
+      "mean_dbm": -77.12,
+      "median_dbm": -77.0,
+      "std_dbm": 4.26,
+      "min_dbm": -85.2,
+      "max_dbm": -64.8,
+      "mean_distance_m": 26.42,
+      "weak_count": 24,
+      "weak_pct": 70.6
+    },
+    {
+      "location": "East Corridor",
+      "sample_count": 24,
+      "mean_dbm": -73.05,
+      "median_dbm": -73.05,
+      "std_dbm": 3.37,
+      "min_dbm": -80.4,
+      "max_dbm": -66.3,
+      "mean_distance_m": 21.07,
+      "weak_count": 5,
+      "weak_pct": 20.8
+    },
+    {
+      "location": "North Wing",
+      "sample_count": 32,
+      "mean_dbm": -60.87,
+      "median_dbm": -62.65,
+      "std_dbm": 6.72,
+      "min_dbm": -73.4,
+      "max_dbm": -45.1,
+      "mean_distance_m": 9.85,
+      "weak_count": 0,
+      "weak_pct": 0.0
+    },
+    {
+      "location": "Central Hall",
+      "sample_count": 34,
+      "mean_dbm": -56.81,
+      "median_dbm": -58.55,
+      "std_dbm": 8.17,
+      "min_dbm": -69.0,
+      "max_dbm": -36.3,
+      "mean_distance_m": 8.97,
+      "weak_count": 0,
+      "weak_pct": 0.0
+    }
+  ]
+}
